@@ -1,0 +1,59 @@
+<component name="InspectionProjectProfileManager">
+  <profile version="1.0">
+    <option name="myName" value="Project Default" />
+    <inspection_tool class="Eslint" enabled="true" level="WARNING" enabled_by_default="true" />
+    <inspection_tool class="PyPackageRequirementsInspection" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="noisereduce" />
+          <option value="soundfile" />
+          <option value="librosa" />
+          <option value="pyloudnorm" />
+          <option value="silero-vad" />
+          <option value="torch" />
+          <option value="torchaudio" />
+          <option value="TorchCodec" />
+          <option value="resemblyzer" />
+          <option value="fastapi" />
+          <option value="uvicorn" />
+          <option value="click" />
+          <option value="python-multipart" />
+          <option value="requests" />
+          <option value="openai" />
+          <option value="pydantic-settings" />
+          <option value="wandb" />
+          <option value="scipy" />
+          <option value="ctranslate2" />
+          <option value="faster-whisper" />
+          <option value="numpy" />
+          <option value="omegaconf" />
+          <option value="spectralcluster" />
+          <option value="ffmpeg-python" />
+          <option value="flask_swagger_ui" />
+          <option value="flask_cors" />
+          <option value="deepspeed" />
+          <option value="pydub" />
+          <option value="torchcodec" />
+          <option value="langchain" />
+          <option value="faiss-cpu" />
+          <option value="pypdf" />
+          <option value="python-dotenv" />
+          <option value="groq" />
+          <option value="langchain_community" />
+          <option value="flask" />
+          <option value="streamlit" />
+          <option value="pydantic" />
+          <option value="pytest" />
+          <option value="kafka-python" />
+        </list>
+      </option>
+    </inspection_tool>
+    <inspection_tool class="PyStubPackagesAdvertiser" enabled="true" level="WARNING" enabled_by_default="true">
+      <option name="ignoredPackages">
+        <list>
+          <option value="scipy" />
+        </list>
+      </option>
+    </inspection_tool>
+  </profile>
+</component>
