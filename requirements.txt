@@ -1,1 +1,4 @@
 langfuse==4.0.0
+duckduckgo-search==8.1.1
+pytest==9.0.2
+dotenv
