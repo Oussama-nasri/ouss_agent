@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Ollama Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #111118;
+    --border:    #1e1e2e;
+    --accent:    #00ff9d;
+    --accent2:   #00c97a;
+    --text:      #e2e8f0;
+    --muted:     #4a5568;
+    --user-bg:   #0d1f14;
+    --agent-bg:  #0f0f1a;
+    --tool-bg:   #0d1520;
+    --tool-color:#38bdf8;
+    --error:     #f87171;
+    --radius:    10px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.04) 2px,
+      rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 32px; height: 32px;
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px;
+    box-shadow: 0 0 12px rgba(0,255,157,0.3);
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 12px rgba(0,255,157,0.3); }
+    50%       { box-shadow: 0 0 22px rgba(0,255,157,0.6); }
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+  .status-dot.online  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .status-dot.loading { background: #fbbf24;       box-shadow: 0 0 6px #fbbf24; animation: blink 0.8s infinite; }
+  .status-dot.error   { background: var(--error);  box-shadow: 0 0 6px var(--error); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .model-badge {
+    font-size: 11px;
+    color: var(--accent);
+    border: 1px solid rgba(0,255,157,0.3);
+    padding: 3px 9px;
+    border-radius: 20px;
+    background: rgba(0,255,157,0.05);
+  }
+
+  .btn-clear {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-clear:hover { border-color: var(--error); color: var(--error); }
+
+  /* ── Messages ── */
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+  }
+
+  #messages::-webkit-scrollbar { width: 4px; }
+  #messages::-webkit-scrollbar-track { background: transparent; }
+  #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .msg {
+    display: flex;
+    gap: 14px;
+    animation: fadeSlide 0.25s ease forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.user  { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .msg.user  .avatar { background: rgba(0,255,157,0.15); border: 1px solid rgba(0,255,157,0.3); }
+  .msg.agent .avatar { background: rgba(99,102,241,0.15); border: 1px solid rgba(99,102,241,0.3); }
+
+  .bubble {
+    max-width: 72%;
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .msg.user  .bubble { background: var(--user-bg);  border: 1px solid rgba(0,255,157,0.15); color: #c6f6d5; border-bottom-right-radius: 2px; }
+  .msg.agent .bubble { background: var(--agent-bg); border: 1px solid var(--border);         border-bottom-left-radius: 2px; }
+
+  .bubble .ts {
+    display: block;
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* Tool call indicator inside bubble */
+  .tool-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--tool-color);
+    background: var(--tool-bg);
+    border: 1px solid rgba(56,189,248,0.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+
+  /* Typing indicator */
+  .typing-bubble {
+    background: var(--agent-bg);
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    border-radius: var(--radius);
+    border-bottom-left-radius: 2px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: bounce 1.2s infinite;
+  }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%,60%,100% { transform: translateY(0); background: var(--muted); }
+    30%          { transform: translateY(-6px); background: var(--accent); }
+  }
+
+  /* Empty state */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--muted);
+    text-align: center;
+    padding: 40px;
+  }
+
+  .empty-icon { font-size: 40px; opacity: 0.4; }
+  .empty-state h2 { font-family: 'Syne', sans-serif; font-size: 20px; color: var(--text); opacity: 0.5; }
+  .empty-state p { font-size: 12px; line-height: 1.6; max-width: 340px; }
+
+  .suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .suggestion {
+    font-size: 11px;
+    border: 1px solid var(--border);
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--muted);
+  }
+  .suggestion:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,255,157,0.05); }
+
+  /* ── Input bar ── */
+  footer {
+    padding: 16px 24px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    transition: border-color 0.2s;
+  }
+  .input-row:focus-within { border-color: rgba(0,255,157,0.4); box-shadow: 0 0 0 3px rgba(0,255,157,0.06); }
+
+  #input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    resize: none;
+    max-height: 120px;
+    line-height: 1.5;
+  }
+
+  #input::placeholder { color: var(--muted); }
+
+  #send-btn {
+    background: var(--accent);
+    border: none;
+    width: 34px; height: 34px;
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    color: #000;
+  }
+  #send-btn:hover:not(:disabled) { background: var(--accent2); transform: scale(1.05); }
+  #send-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  .footer-hint {
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 8px;
+  }
+  .footer-hint kbd {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    <div class="logo-text">Ollama<span>Agent</span></div>
+  </div>
+  <div class="header-right">
+    <div class="status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">connecting...</span>
+    </div>
+    <div class="model-badge" id="model-badge">—</div>
+    <button class="btn-clear" onclick="clearMemory()">clear memory</button>
+  </div>
+</header>
+
+<div id="messages">
+  <div class="empty-state" id="empty">
+    <div class="empty-icon">⬡</div>
+    <h2>Agent ready</h2>
+    <p>Ask anything. The agent can search the web, read & write files, and execute Python code.</p>
+    <div class="suggestions">
+      <div class="suggestion" onclick="suggest(this)">Search for latest AI news</div>
+      <div class="suggestion" onclick="suggest(this)">Calculate first 10 primes</div>
+      <div class="suggestion" onclick="suggest(this)">Write a poem to poem.txt</div>
+      <div class="suggestion" onclick="suggest(this)">List files in workspace</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="input-row">
+    <textarea id="input" rows="1" placeholder="Ask the agent anything…"></textarea>
+    <button id="send-btn" onclick="sendMessage()" title="Send">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+  <div class="footer-hint"><kbd>Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift+Enter</kbd> for new line</div>
+</footer>
+
+<script>
+const API = 'http://localhost:8000';
+let isLoading = false;
+
+// ── Auto-resize textarea ──────────────────────────────────────────────────
+const input = document.getElementById('input');
+input.addEventListener('input', () => {
+  input.style.height = 'auto';
+  input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+});
+
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// ── Health check on load ─────────────────────────────────────────────────
+async function checkHealth() {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  const badge = document.getElementById('model-badge');
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    dot.className  = 'status-dot online';
+    text.textContent = 'online';
+    badge.textContent = d.model;
+  } catch {
+    dot.className  = 'status-dot error';
+    text.textContent = 'server offline';
+    badge.textContent = '—';
+  }
+}
+checkHealth();
+
+// ── Suggest chips ────────────────────────────────────────────────────────
+function suggest(el) {
+  input.value = el.textContent;
+  input.focus();
+}
+
+// ── Send message ──────────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = input.value.trim();
+  if (!text || isLoading) return;
+
+  hideEmpty();
+  addMessage('user', text);
+  input.value = '';
+  input.style.height = 'auto';
+
+  const typingId = addTyping();
+  setLoading(true);
+
+  try {
+    const r = await fetch(`${API}/chat`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ message: text }),
+    });
+
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    removeTyping(typingId);
+    addMessage('agent', d.response);
+  } catch (err) {
+    removeTyping(typingId);
+    addMessage('agent', `❌ Error: ${err.message}\n\nMake sure the server is running:\n  python server.py`, true);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Clear memory ──────────────────────────────────────────────────────────
+async function clearMemory() {
+  try {
+    await fetch(`${API}/clear`, { method: 'POST' });
+  } catch {}
+  document.getElementById('messages').innerHTML = '';
+  document.getElementById('messages').appendChild(buildEmpty());
+}
+
+// ── DOM helpers ───────────────────────────────────────────────────────────
+function hideEmpty() {
+  const e = document.getElementById('empty');
+  if (e) e.remove();
+}
+
+function buildEmpty() {
+  // just a spacer after clearing
+  const d = document.createElement('div');
+  d.style.flex = '1';
+  return d;
+}
+
+function addMessage(role, text, isError = false) {
+  const msgs = document.getElementById('messages');
+
+  const wrap   = document.createElement('div');
+  wrap.className = `msg ${role}`;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = role === 'user' ? '▲' : '⬡';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  if (isError) bubble.style.borderColor = 'rgba(248,113,113,0.3)';
+
+  // Detect tool calls in agent response and highlight them
+  let display = text;
+  if (role === 'agent') {
+    display = highlightTools(text);
+    bubble.innerHTML = display;
+  } else {
+    bubble.textContent = text;
+  }
+
+  const ts = document.createElement('span');
+  ts.className = 'ts';
+  ts.textContent = new Date().toLocaleTimeString();
+  bubble.appendChild(ts);
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function highlightTools(text) {
+  // Highlight TOOL: calls visually
+  const escaped = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return escaped.replace(
+    /TOOL:\s*(\w+)\((\{.*?\})\)/gs,
+    (_, name, args) =>
+      `<span class="tool-tag">⚙ ${name}</span>`
+  );
+}
+
+let typingCounter = 0;
+function addTyping() {
+  const id   = `typing-${typingCounter++}`;
+  const msgs = document.getElementById('messages');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg agent';
+  wrap.id = id;
+
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = '⬡';
+
+  const bubble = document.createElement('div');
+  bubble.className = 'typing-bubble';
+  bubble.innerHTML = '<div class="dot"></div><div class="dot"></div><div class="dot"></div>';
+
+  wrap.appendChild(avatar);
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  return id;
+}
+
+function removeTyping(id) {
+  document.getElementById(id)?.remove();
+}
+
+function setLoading(v) {
+  isLoading = v;
+  document.getElementById('send-btn').disabled = v;
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  if (v) {
+    dot.className   = 'status-dot loading';
+    text.textContent = 'thinking…';
+  } else {
+    dot.className   = 'status-dot online';
+    text.textContent = 'online';
+  }
+}
+</script>
+</body>
+</html>
