@@ -24,6 +24,7 @@ class Agent:
     def __init__(self, llm: BaseLLM, system: str = ""):
         self.llm    = llm
         self.memory = Memory(system=system)
+        logger.info(f"system : {system}")
 
     def __call__(self, user_message: str) -> str:
         logger.info(f"User: {user_message}")
@@ -32,7 +33,8 @@ class Agent:
         for step in range(1, settings.max_steps + 1):
             logger.info(f"--- Step {step}/{settings.max_steps} ---")
             response = self._execute()
-
+            memory = self.memory.get_all()
+            print("MEMORY",memory)
             tool_call = self._parse_tool_call(response)
 
             if tool_call:

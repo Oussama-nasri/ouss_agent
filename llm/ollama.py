@@ -32,8 +32,7 @@ class OllamaLLM(BaseLLM):
     @observe()
     def complete(self, messages: list[dict]) -> str:
         # Separate system prompt — Ollama handles it differently
-        system = next((m["content"] for m in messages if m["role"] == "system"), "")
-        chat_messages = [m for m in messages if m["role"] != "system"]
+        chat_messages = messages
 
         payload = {
             "model":    self.model,
@@ -41,8 +40,6 @@ class OllamaLLM(BaseLLM):
             "stream":   False,
             "options":  {"temperature": 0.7},
         }
-        if system:
-            payload["system"] = system
 
         response = requests.post(
             f"{self.base_url}/api/chat",
