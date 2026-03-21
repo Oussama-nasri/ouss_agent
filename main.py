@@ -1,25 +1,37 @@
 import sys
-from llm.ollama      import OllamaLLM
-from agent.core      import Agent
-from agent.prompts   import build_system_prompt
-from utils.logger    import Logger
+from llm.ollama           import OllamaLLM
+from agent.core           import Agent
+from agent.prompts        import build_system_prompt
+from guardrails.pipeline  import GuardrailPipeline
+from utils.logger         import Logger
 
 logger = Logger(__name__)
 
 BANNER = """
-╔══════════════════════════════════════════╗
-║          🤖  Ollama Agent CLI            ║
-║  Tools: web_search · file_io · python   ║
-║  Type 'exit' to quit · 'clear' to reset ║
-╚══════════════════════════════════════════╝
+╔══════════════════════════════════════════════════╗
+║          🤖  Ollama Agent CLI                    ║
+║  Tools: web_search · file_io · python            ║
+║  Guards: input · output · tool · audit           ║
+║  Type 'exit' to quit · 'clear' to reset          ║
+╚══════════════════════════════════════════════════╝
 """
 
 def main():
     print(BANNER)
 
     try:
-        llm   = OllamaLLM()
-        agent = Agent(llm=llm, system=build_system_prompt())
+        llm        = OllamaLLM()
+        guardrails = GuardrailPipeline(
+            pii_action="warn",                        # log PII but don't block
+            require_confirmation_for=["write_file"],  # ask before overwriting files
+            log_dir="./logs",
+        )
+        agent = Agent(
+            llm=llm,
+            system=build_system_prompt(),
+            guardrails=guardrails,
+            user_id="cli_user",
+        )
     except Exception as e:
         print(f"\n❌ Failed to start: {e}")
         print("Make sure Ollama is running: `ollama serve`")
